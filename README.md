@@ -8,9 +8,9 @@ This package has not yet registered in the METADATA. To install, run the followi
 
 Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
 
-``
+```
 
-# A quick walk-through
+# Quick walk-through
 
 ```julia
 using DataFrames, GaussianProcess
