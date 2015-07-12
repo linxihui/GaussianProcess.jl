@@ -10,8 +10,8 @@ end
 
 # Polynomial kernel
 # 	(x'y + c)^d, where c = offect, d = degree
-function kernPoly(x::Array, degree = 3, offset = 1.0)
-	return (x*x.' + offset).^degree
+function kernPoly(x::Array; degree = 3, offset = 1.0)
+	return (x*x.' .+ offset).^degree
 end
 
 function kernPoly(x::Array, y::Array; degree = 3, offset = 1.0)
