@@ -16,8 +16,8 @@ module GaussianProcess
 	abstract GaussianProcessFitted # output of Gaussian process model
 
 	include("misc.jl")
-	include("kernel_rbf.jl")
-	include("modelmatrix.jl")
+	include("kernels.jl")
+	include("model_matrix.jl")
 	include("gaussian_process.jl")
 
 end
