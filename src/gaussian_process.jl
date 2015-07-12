@@ -35,7 +35,7 @@ function gausspr(formula::Formula, data::DataFrame; args...)
 end
 
 
-function gausspr(x::Array, y::Array;  ylevel = (), kernel = kernRBF, var = 1.0, scaled = true, family = "gaussian", kpar...)
+function gausspr(x::Array, y::Array;  ylev = (), kernel = kernRBF, var = 1.0, scaled = true, family = "gaussian", kpar...)
 	x_center = x_scale = y_center = y_scale = []
 	if scaled
 		x, x_center, x_scale, = standardize(x, rmconst = true)
@@ -48,7 +48,7 @@ function gausspr(x::Array, y::Array;  ylevel = (), kernel = kernRBF, var = 1.0, 
 	F = try
 			chol(K)
 		catch
-			chol(K + 1.e-8*eye(size(kk,1)))
+			chol(K + 1.e-8*eye(size(K,1)))
 		end
 	#
 	if family == "gaussian"
@@ -60,7 +60,7 @@ function gausspr(x::Array, y::Array;  ylevel = (), kernel = kernRBF, var = 1.0, 
 	end
 	mod = glmnet(F.', y, fmly, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
 	alpha = F \ mod.betas.ca;
-	return GaussianProcessFittedMatrix(alpha, kernel, x, x_center, x_scale, y_center, y_scale, family, (), ylevel, kpar)
+	return GaussianProcessFittedMatrix(alpha, kernel, x, x_center, x_scale, y_center, y_scale, family, (), ylev, kpar)
 end
 
 
