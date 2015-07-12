@@ -14,7 +14,7 @@ function modelmatrix(formula::Formula, data::DataFrame; xlev = (), ylev = ())
 		mf = mf[:, 2:size(mf, 2)]
 	end
 	# design matrix
-	xlevempty = (xlev == ())
+	xlevempty = xlev == ()
 	if typeof(mf[:, 1]).parameters[1] <: Number
 		designmatrix = mf[:, 1].data
 		lev = ()
