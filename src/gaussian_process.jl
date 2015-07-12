@@ -69,8 +69,8 @@ function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = "pro
 	x = gp.kernel(x, gp.xmatrix; gp.kpar...)
 	pred = x*gp.alpha;
 	if gp.family == "binomial"
+		pred = 1 ./ (1 + exp(-pred))
 		if outtype == "prob"
-			pred = 1 ./ (1 + exp(-pred))
 			pred = [1. - pred pred]
 		elseif gp.ylev != ()
 			pred = ifelse(pred .< 0.5, ylev[1], ylev[2])
@@ -84,6 +84,7 @@ function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; outtype =
 	formula = gp.formula
 	formula.lhs = nothing
 	x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.ylev)
+
 	if gp.xscale != []
 		x, = standardize(x, gp.xcenter, gp.xscale, rmconst = true)
 	end
@@ -91,8 +92,8 @@ function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; outtype =
 	x = gp.kernel(x, gp.xmatrix; gp.kpar...)
 	pred = x*gp.alpha;
 	if gp.family == "binomial"
+		pred = 1 ./ (1 + exp(-pred))
 		if outtype == "prob"
-			pred = 1 ./ (1 + exp(-pred))
 			pred = [1. - pred pred]
 		else 
 			pred = ifelse(pred .< 0.5, gp.ylev[1], gp.ylev[2])
