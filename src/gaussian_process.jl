@@ -81,7 +81,7 @@ end
 
 
 function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; outtype = "prob")
-	formula = gp.formula
+	formula = deepcopy(gp.formula)
 	formula.lhs = nothing
 	x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.ylev)
 
