@@ -21,7 +21,7 @@ function rowwiseDist(x::Array, y::Array; squared = false)
 end
 
 # standization
-function standardize(x::Matrix, center::Vector, scale::Vector; rmconst = false)
+function standardize(x::Matrix, center::Array, scale::Array; rmconst = false)
 	n = size(x, 1)
 	xscaled = (x - repmat(center, n)) ./ repmat(scale, n)
 	if rmconst
