@@ -1,5 +1,15 @@
 # Gaussian Process
 
+Gaussian process classification, regression, and Cox regression for time-to-event data (not yet implemented). 
+This package has not yet registered in the METADATA. To install, run the following command.
+
+```julia
+# Install
+
+Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
+
+``
+
 # A quick walk-through
 
 ```julia
