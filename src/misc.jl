@@ -2,6 +2,7 @@
 function rowwiseDist(x::Array; squared = false)
 	xNorm = repmat(sum(x.^2, 2), 1, size(x, 1))
 	dist2 = xNorm + xNorm' - 2*x*x'
+	if any(dist2 .< 0) dist2 = abs(dist2) end
 	if squared
 		return dist2
 	else 
@@ -13,6 +14,7 @@ function rowwiseDist(x::Array, y::Array; squared = false)
 	xNorm = repmat(sum(x.^2, 2), 1, size(y, 1))
 	yNorm = repmat(sum(y.^2, 2), 1, size(x, 1))
 	dist2 = xNorm + yNorm' - 2*x*y'
+	if any(dist2 .< 0) dist2 = abs(dist2) end
 	if squared
 		return dist2
 	else 
