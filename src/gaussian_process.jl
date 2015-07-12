@@ -4,8 +4,6 @@ type GaussianProcessFittedMatrix <: GaussianProcessFitted
 	xmatrix::Array
 	xcenter::Array
 	xscale::Array
-	ycenter::Array
-	yscale::Array
 	family::String
 	xlev
 	ylev
@@ -19,8 +17,6 @@ type GaussianProcessFittedFormula <: GaussianProcessFitted
 	formula::Formula
 	xcenter::Array
 	xscale::Array
-	ycenter::Array
-	yscale::Array
 	family::String
 	xlev
 	ylev
@@ -30,8 +26,8 @@ end
 
 function gausspr(formula::Formula, data::DataFrame; args...)
 	x, y, xlev, ylev = modelmatrix(formula, data)
-	o = gpsrc(x, y; args...)
-	return GaussianProcessFittedFormula(o.alpha, o.kernel, o.xmatrix, formula, o.xcenter, o.xscale, o.ycenter, o.yscale, o.family, xlev, ylev, o.kpar)
+	o = gausspr(x, y; args...)
+	return GaussianProcessFittedFormula(o.alpha, o.kernel, o.xmatrix, formula, o.xcenter, o.xscale, o.family, xlev, ylev, o.kpar)
 end
 
 
@@ -39,9 +35,6 @@ function gausspr(x::Array, y::Array;  ylev = (), kernel = kernRBF, var = 1.0, sc
 	x_center = x_scale = y_center = y_scale = []
 	if scaled
 		x, x_center, x_scale, = standardize(x, rmconst = true)
-		if "gaussian" == family
-			y, y_center, y_scale, = standardize(y, rmconst = true)
-		end
 	end
 	K = kernel(x; kpar...)
 	# cholesky decomposition K = R'R,  f = theta = K alpha = R' beta =>  R alpha = beta, F=R'
@@ -52,15 +45,15 @@ function gausspr(x::Array, y::Array;  ylev = (), kernel = kernRBF, var = 1.0, sc
 		end
 	#
 	if family == "gaussian"
-		lambda = var/size(x,1) 
+		lambda = var / size(x,1) 
 		fmly = Normal()
 	elseif family == "binomial"
-		lambda = 1 / size(x, 1);
+		lambda = 1.0 / size(x,1)
 		fmly = Binomial()
 	end
 	mod = glmnet(F.', y, fmly, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
 	alpha = F \ mod.betas.ca;
-	return GaussianProcessFittedMatrix(alpha, kernel, x, x_center, x_scale, y_center, y_scale, family, (), ylev, kpar)
+	return GaussianProcessFittedMatrix(alpha, kernel, x, x_center, x_scale, family, (), ylev, kpar)
 end
 
 
