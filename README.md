@@ -16,10 +16,10 @@ Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
 using DataFrames, GaussianProcess
 
 dat = DataFrame(
-	A = rand(4),
-	B = ["a", "b", "c", "b"],
-	C = randn(4),
-	D = ["A", "B", "A", "B"]
+	A = [0.4, 0.1, 0.7, 0.2],
+	B = ["b", "a", "b", "a"],
+	C = [0.3, 0.8, 0.1, 0.6],
+	D = ["Yes", "No", "Yes", "No"]
 	)
 
 # use Formula-DataFrame input (classification)
