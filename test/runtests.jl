@@ -33,8 +33,7 @@ x_ground_true = [
 	1.0  0.0  0.6  1.0  0.0 ]
 
 @test gp.ylev == ("No","Yes")
-@test maximum(abs(gp_alpha - gp.alpha)) < 0.01
-@test maximum(abs(pred - gp_pred_ground_true)) < 0.01
-@test x == x_ground_true
-@test gp.alpha == gp2.alpha
-@test gp2.xmatrix == x
+@test_approx_eq_eps gp_alpha gp.alpha 1e-2
+@test_approx_eq_eps pred gp_pred_ground_true 1e-2
+@test_approx_eq x x_ground_true
+@test_approx_eq gp2.xmatrix standardize(x)[1]
