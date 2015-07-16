@@ -222,6 +222,10 @@ function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; outtype =
 		else 
 			pred = ifelse(pred .< 0.5, gp.ylev[1], gp.ylev[2])
 		end
+	else 
+		if gp.ycenter == []
+			pred = pred .* gp.yscale .+ gp.ycenter
+		end
 	end
 	return pred
 end
