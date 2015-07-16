@@ -2,3 +2,4 @@ julia 0.3.4
 DataFrames 0.6.0
 Distributions
 GLMNet
+Docile 0.4.5
