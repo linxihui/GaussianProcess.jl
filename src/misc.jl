@@ -22,31 +22,41 @@ function rowwiseDist(x::Array, y::Array; squared = false)
 	end
 end
 
+abstract PreProcess
+
+immutable Standardization <: PreProcess
+    center::Vector{Real}
+    scale::Vector{Real}
+    zero_scale_column::Vector{Bool}
+    function Standardization(center::Vector, scale::Vector = repmat([1], length(scale)), zero_scale_column::Vector = repmat([false], length(scale)))
+        length(center) == length(scale) == length(zero_scale_column) || error("Length of center and scale must match row number of x.")
+        new(center, scale, zero_scale_column)
+    end
+end
+
+function transform(preproc::Standardization, data::Array)
+    n = size(data, 1);
+    (data[:, !preproc.zero_scale_column] - repmat(preproc.center.', n)) ./ repmat(preproc.scale.', n)
+end
+
+function inverseTransform(preproc::Standardization, data::Array)
+    n = size(data, 1);
+    data .* repmat(preproc.scale.', n) + repmat(preproc.center.', n) 
+end
+    
 # standization
-function standardize(x::Matrix, center::Array, scale::Array; rmconst = false)
+function standardize(x::Union(Vector, Matrix), center::Vector = mean(x,1)[:], scale::Vector = std(x, 1)[:]; rm_const = false)
+    size(x, 2) == length(center) == length(scale) || error("Length of center and scale must match row number of x.")
 	n = size(x, 1)
-	xscaled = (x - repmat(center, n)) ./ repmat(scale, n)
-	if rmconst
-		xscaled = xscaled[:, convert(Array{Bool, 1}, [sd > 0 for sd in scale])]
-	end
-	return xscaled, center, scale, rmconst
-end
-
-function standardize(x::Matrix; rmconst = false)
-	center = mean(x, 1)
-	scale = std(x, 1)
-	return standardize(x, center, scale, rmconst = rmconst)
-end
-
-
-function standardize(x::Vector, center::Number, scale::Number)
-	n = size(x, 1)
-	xscaled = (x - center) ./ scale;
-	return xscaled, center, scale, false
-end
-
-function standardize(x::Vector)
-	center = mean(x)
-	scale = std(x)
-	return standardize(x, center, scale)
+    zero_scale_col = repmat([false], size(x,2))
+    if rm_const 
+        zero_scale_col = (scale .== 0)
+        if any(zero_scale_col)
+            x = x[:, zero_scale_col]
+            center = center[zero_scale_col]
+            scale = scale[zero_scale_col]
+        end
+    end
+	xscaled = (x - repmat(center.', n)) ./ repmat(scale.', n)
+	return xscaled, Standardization(center, scale, zero_scale_col)
 end
