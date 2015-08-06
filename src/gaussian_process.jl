@@ -3,16 +3,12 @@
 Object returned from `gausspr(::Array, ::Array)`.
 ## Members
 * `alpha::Array`
-* `kernel::FUnciton`: Kernel/covariance function
+* `kernel::Kernel`: Kernel objects
 * `xmatrix::Array`: Designed matrix (scaled if scaled required in `gausspr`)
-* `xcenter::Array`: A vector of centers (means) of design matrix. `[]` if no scaled.
-* `xscale::Array`: A vector of scales (standard deviations) of design matrix. `[]` if no scaled.
-* `ycenter::Array`: A vector of centers (means) of response matrix. `[]` if no scaled.
-* `yscale::Array`: A vector of scales (standard deviations) of response matrix. `[]` if no scaled.
-* `family::String`: A string of distribution
-* `xlev`: A tuple of tuples of levels of factors in variable DataFrame
+* `xscale::Union(Nothing, Standardization)`: Either `Nothing` or a `Standardization` object
+* `yscale::Union(Nothing, Standardization)`: Either `Nothing` or a `Standardization` object 
+* `family::Distribution`: `Normal`, `Binomial`, `Multinomial`, `Poisson` or `CoxPH`
 * `ylev`: A tuple of levels of response if response is categorical
-* `kpar`: Keyword kernel parameters
 """ ->
 type GaussianProcessFittedMatrix <: GaussianProcessFitted
     alpha::Array
@@ -21,7 +17,6 @@ type GaussianProcessFittedMatrix <: GaussianProcessFitted
     xscale::Union(Nothing, Standardization)
     yscale::Union(Nothing, Standardization)
     family::Distribution
-    xlev::Tuple
     ylev::Tuple
 end
 
@@ -29,29 +24,14 @@ end
 ## Description
 Object returned from `gausspr(::Formula, ::DataFrame)`.
 ## Members
-* `alpha::Array`
-* `kernel::FUnciton`: Kernel/covariance function
-* `xmatrix::Array`: Designed matrix (scaled if scaled required in `gausspr`)
 * `formula::Formula`: Model formula 
-* `xcenter::Array`: A vector of centers (means) of design matrix. `[]` if no scaled.
-* `xscale::Array`: A vector of scales (standard deviations) of design matrix. `[]` if no scaled.
-* `ycenter::Array`: A vector of centers (means) of response matrix. `[]` if no scaled.
-* `yscale::Array`: A vector of scales (standard deviations) of response matrix. `[]` if no scaled.
-* `family::String`: A string of distribution
-* `xlev`: A tuple of tuples of levels of factors in variable DataFrame
-* `ylev`: A tuple of levels of response if response is categorical
-* `kpar`: Keyword kernel parameters
+* `xlev::Tuple`: A tuple of tuples of levels of factors in variable DataFrame
+* `gp::GaussianProcessFittedMatrix`: Object returned form `gausspr(::Matrix, ::Array)`
 """ ->
 type GaussianProcessFittedFormula <: GaussianProcessFitted
-    alpha::Array
-    kernel::Kernel
-    xmatrix::Array
     formula::Formula
-    xscale::Union(Nothing, Standardization)
-    yscale::Union(Nothing, Standardization)
-    family::Distribution
     xlev::Tuple
-    ylev::Tuple
+    gp::GaussianProcessFittedMatrix
 end
 
 @doc """
@@ -64,7 +44,7 @@ It works for classification, regression, cox regression and poission regression 
 * `args`: Keyword arguments for the `gausspr(x::Array, y::Array)`
 
 ## Returns
-A GaussianProcessfittedFormula object. 
+A GaussianProcessFittedFormula object. 
 
 ## Examples
 ```julia
@@ -85,10 +65,10 @@ pred = predict(gp, dat)
 pred_class = predict(gp, dat, outtype = "response")
 ```
 """ ->
-function gausspr(formula::Formula, data::DataFrame; args...)
+function gausspr(formula::Formula, data::DataFrame; kargs...)
     x, y, xlev, ylev = modelmatrix(formula, data)
-    o = gausspr(x, y; args...)
-    return GaussianProcessFittedFormula(o.alpha, o.kernel, o.xmatrix, formula, o.xscale, o.yscale, o.family, xlev, ylev)
+    gp = gausspr(x, y; ylev = ylev, kargs...)
+    return GaussianProcessFittedFormula(formula, xlev, gp)
 end
 
 
@@ -107,7 +87,7 @@ It works for classification, regression, cox regression and poission regression 
 * `kpar`: Keyword arguments for `kernel` function
 
 ## Returns
-A GaussianProcessfittedMatrix object. 
+A GaussianProcessFittedMatrix object. 
 
 ## Examples
 
@@ -151,7 +131,7 @@ function gausspr(x::Array, y::Array; family = Normal(0, 1.0), ylev = (), kernel 
     end
     mod = glmnet(F.', y, family, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
     alpha = F \ mod.betas.ca;
-    return GaussianProcessFittedMatrix(alpha, kernel, x, xscale, yscale, family, (), ())
+    return GaussianProcessFittedMatrix(alpha, kernel, x, xscale, yscale, family, ylev)
 end
 
 
@@ -161,32 +141,33 @@ end
 Prediction on new dataset
 
 ## Arguments
-* `gp::GaussianProcessfittedMatrix`: Object from `gausspr(::Array, ::Array)`
+* `gp::GaussianProcessFittedMatrix`: Object from `gausspr(::Array, ::Array)`
 * `newdata::Array`: Design matrix of data to predict
-* `outtype = "prob"`: Keyword argument either "prob" or "class"
+* `outtype = :prob`: Keyword argument either "prob" or "class"
 
 ## Returns
 Predicted probabilities, classes or response depended on input model
 """ ->
-function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = "prob")
-    if gp.xscale == []
-        x = newdata
-    else 
-        x, = standardize(newdata, gp.xcenter, gp.xscale, rmconst = true)
+function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = :prob)
+    if isa(newdata, Vector)
+        newdata = newdata.'
+    end
+    if !isa(gp.xscale, Nothing)
+        newdata = transform(gp.xscale, newdata)
     end
     #
-    x = gp.kernel(x, gp.xmatrix; gp.kpar...)
+    x = kernelMatrix(gp.kernel, x, gp.xmatrix)
     pred = x*gp.alpha;
-    if gp.family == "binomial"
+    if isa(gp.family, Binomial)
         pred = 1 ./ (1 + exp(-pred))
-        if outtype == "prob"
+        if outtype == :prob
             pred = [1. - pred pred]
         elseif gp.ylev != ()
             pred = ifelse(pred .< 0.5, ylev[1], ylev[2])
         end
-    elseif gp.family == "gaussian"
-        if gp.ycenter == []
-            pred = pred .* gp.yscale .+ gp.ycenter
+    elseif isa(gp.family, Normal)
+        if !isa(gp.yscale, Nothing)
+            pred = inverseTransform(gp.yscale, pred)
         end
     end
     return pred
@@ -197,34 +178,15 @@ end
 # Description
 Prediction on new dataset
 # Arguments
-* `gp::GaussianProcessfittedFormula`: Object from `gausspr(::Formula, ::DataFrame)`
+* `gp::GaussianProcessFittedFormula`: Object from `gausspr(::Formula, ::DataFrame)`
 * `newdata::DataFrame`: DataFrame of data to predict
-* `outtype = "prob"`: Keyword argument either "prob" or "class"
+* `kargs`: other keyword arguments passed to `predict(::GaussianProcessFittedMatrix, ::Array)`
 # Returns
 Predicted probabilities, classes or response depended on input model
 """ ->
-function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; outtype = "prob")
+function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; kargs...)
     formula = deepcopy(gp.formula)
     formula.lhs = nothing
     x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.ylev)
-
-    if gp.xscale != []
-        x, = standardize(x, gp.xcenter, gp.xscale, rmconst = true)
-    end
-    #
-    x = gp.kernel(x, gp.xmatrix; gp.kpar...)
-    pred = x*gp.alpha;
-    if gp.family == "binomial"
-        pred = 1 ./ (1 + exp(-pred))
-        if outtype == "prob"
-            pred = [1. - pred pred]
-        else 
-            pred = ifelse(pred .< 0.5, gp.ylev[1], gp.ylev[2])
-        end
-    elseif gp.family == "gaussian"
-        if gp.ycenter == []
-            pred = pred .* gp.yscale .+ gp.ycenter
-        end
-    end
-    return pred
+    return predict(gp.gp, x; kargs...)
 end
