@@ -1,7 +1,7 @@
-abstract kernel
+abstract Kernel
 
-# Linear kernel
-immutable kernelVanilla <: kernel
+# Linear Kernel
+immutable kernelVanilla <: Kernel
 end
 
 typealias kernelLinear kernelVanilla
@@ -10,7 +10,7 @@ kernelMatrix(K::kernelVanilla, x::Array{Real}, y::Array{Real} = x) = x*y.'
 
 # Polynomial kernel
 # 	(x'y + c)^d, where c = offect, d = degree
-immutable kernelPoly <: kernel
+immutable kernelPoly <: Kernel
     degree::Int
     offset::Real
     function kernelPoly(degree::Int = 3, offset::Real = 1)
@@ -23,7 +23,7 @@ kernelMatrix(K::kernelPoly, x::Array{Real}, y::Array{Real} = x) = (x*y.' .+ K.of
 
 # RBF kernel
 # 	exp(-d^2/(2*σ²)
-immutable kernelRBF <: kernel
+immutable kernelRBF <: Kernel
 	σ::Real
 	function kernelRBF(σ::Real = 1.0)
 		σ > 0 || error("σ must be positive.")
@@ -37,7 +37,7 @@ end
 
 # Laplace kernel
 # 	exp(-d/σ), where d is L2 distance
-immutable kernelLaplace <: kernel
+immutable kernelLaplace <: Kernel
 	σ::Real
 	function kernelLaplace(σ::Real = 1.0)
 		σ > 0 || error("σ must be positive.")
@@ -50,7 +50,7 @@ kernelMatrix(K::kernelLaplace, x::Array, y::Array = x) = exp(-rowwiseDist(x, y))
 # Matern class / Bessel kernel
 # 	@reference https://en.wikipedia.org/wiki/Gaussian_process#Usual_covariance_functions
 # 	where l => d, ρ => σ
-immutable kernelMatern <: kernel
+immutable kernelMatern <: Kernel
 	ν::Real
 	σ::Real
 	function kernelMatern(ν = 2.0, σ = 1.0)
@@ -66,7 +66,7 @@ end
 
 
 # User define kernel (matrix)
-immutable kernelUser <: kernel
+immutable kernelUser <: Kernel
 	K::Matrix{Real}
 	function kernelUser(K::Matrix{Real})
 		isposdef(K) || error("Matrix must be positive definite.")
