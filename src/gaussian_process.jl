@@ -1,7 +1,7 @@
 @doc """
-# Description:
+## Description
 Object returned from `gausspr(::Array, ::Array)`.
-# Members
+## Members
 * `alpha::Array`
 * `kernel::FUnciton`: Kernel/covariance function
 * `xmatrix::Array`: Designed matrix (scaled if scaled required in `gausspr`)
@@ -15,23 +15,20 @@ Object returned from `gausspr(::Array, ::Array)`.
 * `kpar`: Keyword kernel parameters
 """ ->
 type GaussianProcessFittedMatrix <: GaussianProcessFitted
-	alpha::Array
-	kernel::Function
-	xmatrix::Array
-	xcenter::Array
-	xscale::Array
-	ycenter::Array
-	yscale::Array
-	family::String
-	xlev
-	ylev
-	kpar
+    alpha::Array
+    kernel::Kernel
+    xmatrix::Array
+    xscale::Union(Nothing, Standardization)
+    yscale::Union(Nothing, Standardization)
+    family::Distribution
+    xlev::Tuple
+    ylev::Tuple
 end
 
 @doc """
-# Description:
+## Description
 Object returned from `gausspr(::Formula, ::DataFrame)`.
-# Members
+## Members
 * `alpha::Array`
 * `kernel::FUnciton`: Kernel/covariance function
 * `xmatrix::Array`: Designed matrix (scaled if scaled required in `gausspr`)
@@ -46,40 +43,39 @@ Object returned from `gausspr(::Formula, ::DataFrame)`.
 * `kpar`: Keyword kernel parameters
 """ ->
 type GaussianProcessFittedFormula <: GaussianProcessFitted
-	alpha::Array
-	kernel::Function
-	xmatrix::Array
-	formula::Formula
-	xcenter::Array
-	xscale::Array
-	ycenter::Array
-	yscale::Array
-	family::String
-	xlev
-	ylev
-	kpar
+    alpha::Array
+    kernel::Kernel
+    xmatrix::Array
+    formula::Formula
+    xscale::Union(Nothing, Standardization)
+    yscale::Union(Nothing, Standardization)
+    family::Distribution
+    xlev::Tuple
+    ylev::Tuple
 end
 
 @doc """
-# Description
+## Description
 It works for classification, regression, cox regression and poission regression The first/main purpose is to implement Gaussian process into Cox's model. Package glmnet is used to solve a general Ridge-regularized regression solver. 
-# Arguments:
+
+## Arguments
 * `formula::Formula`: Formula to express the model
 * `data::DataFrame`: DataFrame of data to train
 * `args`: Keyword arguments for the `gausspr(x::Array, y::Array)`
-# Returns:
-A GaussianProcessfittedFormula object. 
-# Examples:
 
+## Returns
+A GaussianProcessfittedFormula object. 
+
+## Examples
 ```julia
 using DataFrames, GaussianProcess
 
 dat = DataFrame(
-	A = [0.4, 0.1, 0.7, 0.2],
-	B = ["b", "a", "b", "a"],
-	C = [0.3, 0.8, 0.1, 0.6],
-	D = ["Yes", "No", "Yes", "No"]
-	)
+    A = [0.4, 0.1, 0.7, 0.2],
+    B = ["b", "a", "b", "a"],
+    C = [0.3, 0.8, 0.1, 0.6],
+    D = ["Yes", "No", "Yes", "No"]
+    )
 
 # use Formula-DataFrame input (classification)
 gp = gausspr(D ~ A + B + C, dat, family = "binomial")
@@ -90,16 +86,17 @@ pred_class = predict(gp, dat, outtype = "response")
 ```
 """ ->
 function gausspr(formula::Formula, data::DataFrame; args...)
-	x, y, xlev, ylev = modelmatrix(formula, data)
-	o = gausspr(x, y; args...)
-	return GaussianProcessFittedFormula(o.alpha, o.kernel, o.xmatrix, formula, o.xcenter, o.xscale, o.ycenter, o.yscale, o.family, xlev, ylev, o.kpar)
+    x, y, xlev, ylev = modelmatrix(formula, data)
+    o = gausspr(x, y; args...)
+    return GaussianProcessFittedFormula(o.alpha, o.kernel, o.xmatrix, formula, o.xscale, o.yscale, o.family, xlev, ylev)
 end
 
 
 @doc """
-# Description
+## Description
 It works for classification, regression, cox regression and poission regression The first/main purpose is to implement Gaussian process into Cox's model. Package glmnet is used to solve a general Ridge-regularized regression solver. 
-# Arguments:
+
+## Arguments
 * `x::Array`: Model design matrix
 * `y::Array`: Response vector(regresion, binomial) or matrix (binomial, multinomial, survival)
 * `ylevl = ()`: Tuple of response levels for classification
@@ -108,19 +105,21 @@ It works for classification, regression, cox regression and poission regression 
 * `scaled = true`: If to standardize design matrix `x` (and `y` if regression)
 * `family = "gaussian"`: Distribution of y. Options: 'gaussian', 'binomial' (possibly 'poisson', 'multinomial', 'cox' in the future)
 * `kpar`: Keyword arguments for `kernel` function
-# Returns:
+
+## Returns
 A GaussianProcessfittedMatrix object. 
-# Examples:
+
+## Examples
 
 ```julia
 using DataFrames, GaussianProcess
 
 dat = DataFrame(
-	A = [0.4, 0.1, 0.7, 0.2],
-	B = ["b", "a", "b", "a"],
-	C = [0.3, 0.8, 0.1, 0.6],
-	D = ["Yes", "No", "Yes", "No"]
-	)
+    A = [0.4, 0.1, 0.7, 0.2],
+    B = ["b", "a", "b", "a"],
+    C = [0.3, 0.8, 0.1, 0.6],
+    D = ["Yes", "No", "Yes", "No"]
+    )
 
 x, y = modelmatrix(A ~ B + C + D, dat)
 gp = gausspr(x, y, family = "gaussian");
@@ -129,103 +128,103 @@ gp = gausspr(x, y, family = "gaussian");
 pred = predict(gp, x)
 ```
 """ ->
-function gausspr(x::Array, y::Array;  ylev = (), kernel = kernRBF, var = 1.0, scaled = true, family = "gaussian", kpar...)
-	x_center = x_scale = y_center = y_scale = []
-	if scaled
-		x, x_center, x_scale, = standardize(x, rmconst = true)
-		if family == "gaussian"
-			y, y_center, y_scale = standardize(y, rmconst = false)
-		end
-	end
-	K = kernel(x; kpar...)
-	# cholesky decomposition K = R'R,  f = theta = K alpha = R' beta =>  R alpha = beta, F=R'
-	F = try
-			chol(K)
-		catch
-			chol(K + 1.e-8*eye(size(K,1)))
-		end
-	#
-	if family == "gaussian"
-		lambda = var / size(x,1) 
-		fmly = Normal()
-	elseif family == "binomial"
-		lambda = 1.0 / size(x,1)
-		fmly = Binomial()
-	end
-	mod = glmnet(F.', y, fmly, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
-	alpha = F \ mod.betas.ca;
-	return GaussianProcessFittedMatrix(alpha, kernel, x, x_center, x_scale, y_center, y_scale, family, (), ylev, kpar)
+function gausspr(x::Array, y::Array; family = Normal(0, 1.0), ylev = (), kernel = kernelRBF(5), scaled = true)
+    xscale = yscale = nothing
+    if scaled
+        x, xscale = standardize(x, rm_const = true)
+        if isa(family, Normal)
+            y, yscale = standardize(y, rm_const = false)
+        end
+    end
+    K = kernelMatrix(kernel, x)
+    # cholesky decomposition K = R'R,  f = theta = K alpha = R' beta =>  R alpha = beta, F=R'
+    F = try
+            chol(K)
+        catch
+            chol(K + 1.e-8*eye(size(K,1)))
+        end
+    #
+    if isa(family, Normal)
+        lambda = std(family)^2 / size(x,1) 
+    elseif isa(family, Binomial)
+        lambda = 1.0 / size(x,1)
+    end
+    mod = glmnet(F.', y, family, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
+    alpha = F \ mod.betas.ca;
+    return GaussianProcessFittedMatrix(alpha, kernel, x, xscale, yscale, family, (), ())
 end
 
 
 # predict function
 @doc """
-# Description
+## Description
 Prediction on new dataset
-# Arguments:
+
+## Arguments
 * `gp::GaussianProcessfittedMatrix`: Object from `gausspr(::Array, ::Array)`
 * `newdata::Array`: Design matrix of data to predict
 * `outtype = "prob"`: Keyword argument either "prob" or "class"
-# Returns:
+
+## Returns
 Predicted probabilities, classes or response depended on input model
 """ ->
 function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = "prob")
-	if gp.xscale == []
-		x = newdata
-	else 
-		x, = standardize(newdata, gp.xcenter, gp.xscale, rmconst = true)
-	end
-	#
-	x = gp.kernel(x, gp.xmatrix; gp.kpar...)
-	pred = x*gp.alpha;
-	if gp.family == "binomial"
-		pred = 1 ./ (1 + exp(-pred))
-		if outtype == "prob"
-			pred = [1. - pred pred]
-		elseif gp.ylev != ()
-			pred = ifelse(pred .< 0.5, ylev[1], ylev[2])
-		end
-	else 
-		if gp.ycenter == []
-			pred = pred .* gp.yscale .+ gp.ycenter
-		end
-	end
-	return pred
+    if gp.xscale == []
+        x = newdata
+    else 
+        x, = standardize(newdata, gp.xcenter, gp.xscale, rmconst = true)
+    end
+    #
+    x = gp.kernel(x, gp.xmatrix; gp.kpar...)
+    pred = x*gp.alpha;
+    if gp.family == "binomial"
+        pred = 1 ./ (1 + exp(-pred))
+        if outtype == "prob"
+            pred = [1. - pred pred]
+        elseif gp.ylev != ()
+            pred = ifelse(pred .< 0.5, ylev[1], ylev[2])
+        end
+    elseif gp.family == "gaussian"
+        if gp.ycenter == []
+            pred = pred .* gp.yscale .+ gp.ycenter
+        end
+    end
+    return pred
 end
 
 
 @doc """
 # Description
 Prediction on new dataset
-# Arguments:
+# Arguments
 * `gp::GaussianProcessfittedFormula`: Object from `gausspr(::Formula, ::DataFrame)`
 * `newdata::DataFrame`: DataFrame of data to predict
 * `outtype = "prob"`: Keyword argument either "prob" or "class"
-# Returns:
+# Returns
 Predicted probabilities, classes or response depended on input model
 """ ->
 function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; outtype = "prob")
-	formula = deepcopy(gp.formula)
-	formula.lhs = nothing
-	x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.ylev)
+    formula = deepcopy(gp.formula)
+    formula.lhs = nothing
+    x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.ylev)
 
-	if gp.xscale != []
-		x, = standardize(x, gp.xcenter, gp.xscale, rmconst = true)
-	end
-	#
-	x = gp.kernel(x, gp.xmatrix; gp.kpar...)
-	pred = x*gp.alpha;
-	if gp.family == "binomial"
-		pred = 1 ./ (1 + exp(-pred))
-		if outtype == "prob"
-			pred = [1. - pred pred]
-		else 
-			pred = ifelse(pred .< 0.5, gp.ylev[1], gp.ylev[2])
-		end
-	else 
-		if gp.ycenter == []
-			pred = pred .* gp.yscale .+ gp.ycenter
-		end
-	end
-	return pred
+    if gp.xscale != []
+        x, = standardize(x, gp.xcenter, gp.xscale, rmconst = true)
+    end
+    #
+    x = gp.kernel(x, gp.xmatrix; gp.kpar...)
+    pred = x*gp.alpha;
+    if gp.family == "binomial"
+        pred = 1 ./ (1 + exp(-pred))
+        if outtype == "prob"
+            pred = [1. - pred pred]
+        else 
+            pred = ifelse(pred .< 0.5, gp.ylev[1], gp.ylev[2])
+        end
+    elseif gp.family == "gaussian"
+        if gp.ycenter == []
+            pred = pred .* gp.yscale .+ gp.ycenter
+        end
+    end
+    return pred
 end
