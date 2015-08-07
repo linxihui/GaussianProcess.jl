@@ -10,13 +10,13 @@ Object returned from `gausspr(::Array, ::Array)`.
 * `family::Distribution`: `Normal`, `Binomial`, `Multinomial`, `Poisson` or `CoxPH`
 * `ylev`: A tuple of levels of response if response is categorical
 """ ->
-type GaussianProcessFittedMatrix <: GaussianProcessFitted
-    alpha::Array
+type GaussianProcessFittedMatrix{T <: Distribution} <: GaussianProcessFitted
+    family::T
     kernel::Kernel
+    alpha::Array
     xmatrix::Array
     xscale::Union(Nothing, Standardization)
     yscale::Union(Nothing, Standardization)
-    family::Distribution
     ylev::Tuple
 end
 
@@ -58,16 +58,17 @@ dat = DataFrame(
     )
 
 # use Formula-DataFrame input (classification)
-gp = gausspr(D ~ A + B + C, dat, family = "binomial")
+gp = gausspr(D ~ A + B + C, dat, Binomial())
 
 # predict class probabilities
-pred = predict(gp, dat)
-pred_class = predict(gp, dat, outtype = "response")
+pred_link = predict(gp, dat)
+pred_prob = predict(gp, dat, outtype = :prob)
+pred_class = predict(gp, dat, outtype = :class)
 ```
 """ ->
-function gausspr(formula::Formula, data::DataFrame; kargs...)
+function gausspr(formula::Formula, data::DataFrame, family = Normal(0, 1.); kargs...)
     x, y, xlev, ylev = modelmatrix(formula, data)
-    gp = gausspr(x, y; ylev = ylev, kargs...)
+    gp = gausspr(x, y, family; ylev = ylev, kargs...)
     return GaussianProcessFittedFormula(formula, xlev, gp)
 end
 
@@ -84,7 +85,6 @@ It works for classification, regression, cox regression and poission regression 
 * `var = 1.0`: Variance of Gaussian noise for regression only
 * `scaled = true`: If to standardize design matrix `x` (and `y` if regression)
 * `family = "gaussian"`: Distribution of y. Options: 'gaussian', 'binomial' (possibly 'poisson', 'multinomial', 'cox' in the future)
-* `kpar`: Keyword arguments for `kernel` function
 
 ## Returns
 A GaussianProcessFittedMatrix object. 
@@ -102,13 +102,13 @@ dat = DataFrame(
     )
 
 x, y = modelmatrix(A ~ B + C + D, dat)
-gp = gausspr(x, y, family = "gaussian");
+gp = gausspr(x, y);
 
 # prediction
 pred = predict(gp, x)
 ```
 """ ->
-function gausspr(x::Array, y::Array; family = Normal(0, 1.0), ylev = (), kernel = kernelRBF(5), scaled = true)
+function gausspr(x::Array, y::Array, family = Normal(0, 1.0); kernel = kernelRBF(5), ylev = (), scaled = true)
     xscale = yscale = nothing
     if scaled
         x, xscale = standardize(x, rm_const = true)
@@ -118,24 +118,24 @@ function gausspr(x::Array, y::Array; family = Normal(0, 1.0), ylev = (), kernel 
     end
     K = kernelMatrix(kernel, x)
     # cholesky decomposition K = R'R,  f = theta = K alpha = R' beta =>  R alpha = beta, F=R'
-    F = try
-            chol(K)
-        catch
-            chol(K + 1.e-8*eye(size(K,1)))
-        end
+    F = try chol(K) catch chol(K + 1.e-8*eye(size(K,1))) end
     #
     if isa(family, Normal)
         lambda = std(family)^2 / size(x,1) 
-    elseif isa(family, Binomial)
+    else
         lambda = 1.0 / size(x,1)
     end
     mod = glmnet(F.', y, family, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
-    alpha = F \ mod.betas.ca;
-    return GaussianProcessFittedMatrix(alpha, kernel, x, xscale, yscale, family, ylev)
+    alpha = F \ convert(Array, mod.betas)
+    if isa(family, Union(Normal, CoxPH, Poisson))
+        alpha = alpha[:]
+    end
+    return GaussianProcessFittedMatrix(family, kernel, alpha, x, xscale, yscale, ylev)
 end
 
 
 # predict function
+
 @doc """
 ## Description
 Prediction on new dataset
@@ -143,32 +143,34 @@ Prediction on new dataset
 ## Arguments
 * `gp::GaussianProcessFittedMatrix`: Object from `gausspr(::Array, ::Array)`
 * `newdata::Array`: Design matrix of data to predict
-* `outtype = :prob`: Keyword argument either "prob" or "class"
+* `outtype = :link`: Keyword arguments depends on problem type
+    - Gaussian regression: `outtype` has no effect
+    - classification: `:link`, `:prob`, `:class`
+    - Possion or Cox: `:link`, `:risk`
 
 ## Returns
 Predicted probabilities, classes or response depended on input model
 """ ->
-function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = :prob)
+function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = :link)
     if isa(newdata, Vector)
         newdata = newdata.'
     end
     if !isa(gp.xscale, Nothing)
         newdata = transform(gp.xscale, newdata)
     end
-    #
-    x = kernelMatrix(gp.kernel, x, gp.xmatrix)
-    pred = x*gp.alpha;
-    if isa(gp.family, Binomial)
-        pred = 1 ./ (1 + exp(-pred))
-        if outtype == :prob
-            pred = [1. - pred pred]
-        elseif gp.ylev != ()
-            pred = ifelse(pred .< 0.5, ylev[1], ylev[2])
-        end
-    elseif isa(gp.family, Normal)
+    x = kernelMatrix(gp.kernel, newdata, gp.xmatrix)
+    pred = x*gp.alpha
+    # return depends on family type
+    if isa(gp.family, Normal)
         if !isa(gp.yscale, Nothing)
             pred = inverseTransform(gp.yscale, pred)
         end
+    elseif isa(gp.family, Binomial)
+        pred = transform_link([pred -pred], outtype, gp.ylev)
+    elseif isa(gp.family, Multinomial)
+        pred = transform_link(pred, outtype, gp.ylev)
+    else
+        pred = transform_link(gp.family, pred, outtype)
     end
     return pred
 end
@@ -187,6 +189,6 @@ Predicted probabilities, classes or response depended on input model
 function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; kargs...)
     formula = deepcopy(gp.formula)
     formula.lhs = nothing
-    x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.ylev)
+    x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.gp.ylev)
     return predict(gp.gp, x; kargs...)
 end
