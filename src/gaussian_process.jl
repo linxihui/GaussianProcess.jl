@@ -126,7 +126,8 @@ function gausspr(x::Array, y::Array, family = Normal(0, 1.0); kernel = kernelRBF
         lambda = 1.0 / size(x,1)
     end
     mod = glmnet(F.', y, family, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
-    alpha = F \ convert(Array, mod.betas)
+	betas = isa(family, Multinomial)? mod.betas[:, :, 1] : convert(Array, mod.betas)
+    alpha = F \ betas
     if isa(family, Union(Normal, CoxPH, Poisson))
         alpha = alpha[:]
     end
