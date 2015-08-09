@@ -1,17 +1,15 @@
 @doc """
 ## Description
-Create a model matrix from Formual and DataFrame input. Note that all factors (categorical variables) are represented as FULL dummy variables
+Complete ".." in a formula
 
 ## Arguments
-* `formula::Formual`: A `Formula` object from `DataFrames`. `..` can be used to indicate all variables else in `data` (other than those have been mentioned), which is whats the same as `.` in R.
-* `data::DataFrame`: A data frame of data.
-* `xlev = ()`: A tuple of tuple of levels of categorical independent variables Usually not specified.
-* `ylev = ()`: A tuple of levels of the categorical response. Usually not specified.
+* `formula::Formula`: A model formula
+* `data:DataFrame`: A data frame
 
 ## Returns
-* A tuple of desig matrix, response matrix, 
+A formula with ".." filled if any
 """ ->
-function modelmatrix(formula::Formula, data::DataFrame; xlev = (), ylev = ())
+function completeFormula(formula::Formula, data::DataFrame)
     if formula.rhs == :.. || (isa(formula.rhs, Expr) && formula.rhs.args[length(formula.rhs.args)] == :..)
 		formula = deepcopy(formula)
         args = isa(formula.lhs, Symbol)? [formula.lhs] : isa(formula.lhs, Nothing)? [] : formula.lhs.args
@@ -23,6 +21,24 @@ function modelmatrix(formula::Formula, data::DataFrame; xlev = (), ylev = ())
             formula.rhs.args = [formula.rhs.args[1:(length(formula.rhs.args) - 1)], dots]
         end
     end
+	return formula
+end
+
+@doc """
+## Description
+Create a model matrix from Formual and DataFrame input. Note that all factors (categorical variables) are represented as FULL dummy variables
+
+## Arguments
+* `formula::Formual`: A `Formula` object from `DataFrames`. `..` can be used to indicate all variables else in `data` (other than those have been mentioned), which is whats the same as `.` in R.
+* `data::DataFrame`: A data frame of data.
+* `xlev = ()`: A tuple of tuple of levels of categorical independent variables Usually not specified.
+* `ylev = ()`: A tuple of levels of the categorical response. Usually not specified.
+
+## Returns
+* A tuple of desig matrix, response matrix, xlev and ylev tuples
+""" ->
+function modelmatrix(formula::Formula, data::DataFrame; xlev = (), ylev = ())
+	formula = completeFormula(formula, data);
     mf = ModelFrame(formula, data).df
     # response
     if isa(formula.lhs, Nothing) 
