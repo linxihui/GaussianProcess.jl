@@ -188,7 +188,7 @@ Prediction on new dataset
 Predicted probabilities, classes or response depended on input model
 """ ->
 function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; kargs...)
-    formula = deepcopy(gp.formula)
+    formula = completeFormula(gp.formula)
     formula.lhs = nothing
     x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.gp.ylev)
     return predict(gp.gp, x; kargs...)
