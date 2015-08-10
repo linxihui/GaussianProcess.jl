@@ -1,25 +1,25 @@
 # compute row-wise Euclidean distance
 function rowwiseDist(x::Array; squared = false)
-	xNorm = repmat(sum(x.^2, 2), 1, size(x, 1))
-	dist2 = xNorm + xNorm' - 2*x*x'
-	if any(dist2 .< 0) dist2 = abs(dist2) end
-	if squared
-		return dist2
-	else 
-		return sqrt(dist2)
-	end
+    xNorm = repmat(sum(x.^2, 2), 1, size(x, 1))
+    dist2 = xNorm + xNorm' - 2*x*x'
+    if any(dist2 .< 0) dist2 = abs(dist2) end
+    if squared
+        return dist2
+    else
+        return sqrt(dist2)
+    end
 end
 
 function rowwiseDist(x::Array, y::Array; squared = false)
-	xNorm = repmat(sum(x.^2, 2), 1, size(y, 1))
-	yNorm = repmat(sum(y.^2, 2), 1, size(x, 1))
-	dist2 = xNorm + yNorm' - 2*x*y'
-	if any(dist2 .< 0) dist2 = abs(dist2) end
-	if squared
-		return dist2
-	else 
-		return sqrt(dist2)
-	end
+    xNorm = repmat(sum(x.^2, 2), 1, size(y, 1))
+    yNorm = repmat(sum(y.^2, 2), 1, size(x, 1))
+    dist2 = xNorm + yNorm' - 2*x*y'
+    if any(dist2 .< 0) dist2 = abs(dist2) end
+    if squared
+        return dist2
+    else
+        return sqrt(dist2)
+    end
 end
 
 abstract PreProcess
@@ -49,7 +49,7 @@ end
 # standization
 function standardize(x::Union(Vector, Matrix), center::Vector = mean(x,1)[:], scale::Vector = std(x, 1)[:]; rm_const = false)
     size(x, 2) == length(center) == length(scale) || error("Length of center and scale must match row number of x.")
-	n = size(x, 1)
+    n = size(x, 1)
     zero_scale_col = repmat([false], size(x,2))
     if rm_const 
         zero_scale_col = convert(Vector{Bool}, (scale .== 0))
@@ -59,9 +59,9 @@ function standardize(x::Union(Vector, Matrix), center::Vector = mean(x,1)[:], sc
             scale = scale[zero_scale_col]
         end
     end
-	xscaled = (x - repmat(center.', n)) ./ repmat(scale.', n)
+    xscaled = (x - repmat(center.', n)) ./ repmat(scale.', n)
     if isa(x, Vector) xscaled = xscaled[:] end
-	return xscaled, Standardization(center, scale, zero_scale_col)
+    return xscaled, Standardization(center, scale, zero_scale_col)
 end
 
 
@@ -70,7 +70,8 @@ function transform_link(link::Array, outtype::Symbol, ylev::Tuple)
     if outtype == :link
         return link
     else
-        pred = 1 ./ (1. + exp(-link))
+        pred = exp(link)
+        pred = pred ./ repmat(sum(pred, 2), 1, size(pred, 2))
         if outtype == :prob
             return pred
         elseif outtype == :class
@@ -97,4 +98,40 @@ function transform_link(family::Union(Poisson, CoxPH), link::Array, outtype::Sym
             error("For Cox model, outtype must be :link or :risk.")
         end
     end
+end
+
+
+type ROC
+    fp::Vector{Float64}
+    tp::Vector{Float64}
+    threshold::Vector{Float64}
+    auc::Float64
+end
+
+function ROC(obs::Vector, prob::Vector)
+    lev = sort(unique(obs))
+    length(lev) == 2 || error("obs must have exactly two classes.")
+    length(obs) == length(prob) || error("obs and prob must have same length.")
+    obs = [0,1][1 + int(obs .== lev[2])]
+    uniq_prob = sort(unique(prob), rev = true)
+    threshold = (uniq_prob[1:(length(uniq_prob)-1)] + uniq_prob[2:length(uniq_prob)]) / 2.0
+    threshold = [Inf, threshold..., -Inf]
+    dist_obs = counts(obs, 0:1)
+    function compute_fptp(obs::Vector, prob::Vector, thresh::Real)
+        pred = int(prob .> thresh)
+        tab = counts(obs, pred, (0:1, 0:1))
+        (tab[:, 2] ./ dist_obs).'
+    end
+    n = length(threshold)
+    fp_tp = [[compute_fptp(obs, prob, thresh) for thresh in threshold]...]
+    auc = sum((fp_tp[2:n, 2] + fp_tp[1:(n-1), 2]) .* diff(fp_tp[:, 1])) / 2.0
+    ROC(fp_tp[:, 1], fp_tp[:, 2], threshold, auc)
+end
+
+import Gadfly.plot
+
+function plot(object::ROC, args...; kargs...)
+    plot(x = object.fp, y = object.tp, Gadfly.Geom.line(preserve_order = true),
+        Gadfly.Guide.xlabel("False Positive"), Gadfly.Guide.ylabel("True Positive"),
+        args...; kargs...)
 end
