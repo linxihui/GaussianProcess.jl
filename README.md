@@ -34,7 +34,7 @@ For `Distribution`, currently 5 different types are supported.
 - `CoxPH()`: survival or time-to-event data
 
 Different Kernels are available, including 
-- `kernelLinear()` or `kernelVanilla`
+- `kernelLinear()` or `kernelVanilla()`
 - `kernelPoly(degree=3, offset=1.0)`
 - `kernelRBF(σ=1.0)`: `σ` is the standard deviation
 - `kernelLaplace(σ=1.0)`: `σ` is the scale parameter
