@@ -1,6 +1,6 @@
 # Gaussian Process
 
-Gaussian process classification, regression, and Cox regression for time-to-event data (not yet implemented). 
+Gaussian process classification, regression, and Cox regression for time-to-event data
 This package has not yet registered in the METADATA. To install, run the following command.
 
 ```julia
@@ -10,29 +10,115 @@ Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
 
 ```
 
-# Quick walk-through
+# Syntax
+
+The main function of this package is `gausspr`, which have two methods like R
+`gausspr(::Formula, ::DataFrame, ::Distribution)` and `gausspr(::Array, ::Array, ::Distribution)`. 
+Symbol `..` is supported in `Formula`, meaning all other variables in `DataFrame`, equivalent to
+the `.` symbole in R formula. For example `y ~ ..` means `y` is the response and all other variable
+in the `DataFrame` are predictors.  For `Distribution`, corrently 5 different types are supported, 
+which are `Normal()` for continuous response or regression, `Binomial()` and `Multinomial()` for 
+classifications, `Poisson()`  for count data, and `CoxPH()` for survival analysis.
+
+Different Kernels are supported as well, including `kernelLinear`, `kernelPoly`, `kernelRBF`, `kernelLaplace`, `kernelMatern`, `kernelUser` (user defined kernel matrix). Kernel parameters can be specified as `kernelRBF(5.0)`, `kernelPoly(3, 1)`. See examples below.
+
+# A Quick Guide
 
 ```julia
-using DataFrames, GaussianProcess
+julia> using DataFrames, GaussianProcess
 
-dat = DataFrame(
-	A = [0.4, 0.1, 0.7, 0.2],
-	B = ["b", "a", "b", "a"],
-	C = [0.3, 0.8, 0.1, 0.6],
-	D = ["Yes", "No", "Yes", "No"]
-	)
+julia> dat = DataFrame(
+           A = [0.4, 0.1, 0.7, 0.2],
+           B = ["b", "a", "b", "a"],
+           C = [0.3, 0.8, 0.1, 0.6],
+           D = ["Yes", "No", "Yes", "No"]
+           );
 
-# use Formula-DataFrame input (classification)
-gp = gausspr(D ~ A + B + C, dat, family = "binomial")
+julia> gp = gausspr(D ~ A + B + C, dat, Binomial());
 
-# predict class probabilities
-pred = predict(gp, dat)
-pred_class = predict(gp, dat, outtype = "response")
+julia> # predict class probabilities
 
-# use x-y input (regression)
-x, y = modelmatrix(A ~ B + C + D, dat)
-gp2 = gausspr(x, y, family = "gaussian");
+julia> pred = predict(gp, dat, outtype = :prob)
+4x2 Array{Float64,2}:
+ 0.432865  0.567135
+ 0.597388  0.402612
+ 0.394668  0.605332
+ 0.575207  0.424793
 
-# prediction
-pred2 = predict(gp2, x)
+julia> pred_class = predict(gp, dat, outtype = :class)
+4-element Array{String,1}:
+ "Yes"
+ "No"
+ "Yes"
+ "No"
+
+julia> # use x-y input (regression)
+
+julia> x, y = modelmatrix(A ~ B + C + D, dat)
+(
+4x5 Array{Float64,2}:
+ 0.0  1.0  0.3  0.0  1.0
+ 1.0  0.0  0.8  1.0  0.0
+ 0.0  1.0  0.1  0.0  1.0
+ 1.0  0.0  0.6  1.0  0.0,
+
+[0.4,0.1,0.7,0.2],(("a","b"),(),("No","Yes")),())
+
+
+julia> gp2 = gausspr(x, y, Normal(0, 1), kernel = kernelPoly(3, 1));
+
+julia> pred2 = predict(gp2, x)
+4-element Array{Float64,1}:
+ 0.409322
+ 0.0996975
+ 0.690604
+ 0.200377 
+```
+
+# Binary classification
+
+```julia
+julia> using RDatasets
+
+julia> srand(123)
+
+julia> kyphosis = dataset("rpart", "kyphosis");
+
+julia> kyphosis[:Kyphosis] = convert(Array, kyphosis[:Kyphosis]);
+
+julia> iTrain = sample(1:size(kyphosis, 1), 40, replace = false);
+
+julia> iTest = setdiff(1:size(kyphosis, 1), iTrain);
+
+julia> ky_mod = gausspr(Kyphosis ~ .., kyphosis[iTrain, :], Binomial());
+
+julia> ky_pred = predict(ky_mod, kyphosis[iTest, :], outtype = :prob);
+
+julia> out = ROC(kyphosis[iTest, :Kyphosis].data, ky_pred[:, 1]);
+
+julia> out.auc
+0.8715277777777777
+
+julia> plot(out)
+```
+![](https://rawgit.com/linxihui/Misc/master/Images/GaussianProcess.jl/ROC.svg)
+
+
+# Regression
+
+```julia
+julia> srand(456)
+
+julia> boston = dataset("MASS", "Boston");
+
+julia> iTrain = sample(1:size(boston, 1), 300, replace = false);
+
+julia> iTest = setdiff(1:size(boston, 1), iTrain);
+
+julia> mod_boston = gausspr(MedV ~ .., boston[iTrain, :], kernel = kernelMatern(2, 1));
+
+julia> pred_boston = predict(mod_boston, boston[iTest, :]);
+
+julia> err_boston = sqrt(mean((convert(Array, boston[iTest, :MedV]) - pred_boston).^2))
+3.3446708896894983
 ```
