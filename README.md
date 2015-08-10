@@ -9,7 +9,7 @@ Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
 
 ```
 
-Since it dependes on the newest [`GLMNet`](https://github.com/linxihui/GLMNet.jl), which is in my branch and has not been merge to the main branch, one has to clone and build the package as
+Since it depends on the newest [`GLMNet`](https://github.com/linxihui/GLMNet.jl), which is in my branch and has not been merge to the main branch, one has to clone and build the package as
 
 ```julia
 Pkg.clone("git://github.com/linxihui/GLMNet.jl")
@@ -24,7 +24,7 @@ The main function of this package is `gausspr`, which have two methods like R
 - `gausspr(::Array, ::Array, ::Distribution)`
 
 In formula, symbol `..` is supported, which means all other variables in `DataFrame`, equivalent to
-the `.` symbole in R formula. For example `y ~ ..` means `y` is the response and all other variable except `y`
+the `.` symbol in R formula. For example `y ~ ..` means `y` is the response and all other variable except `y`
 in the `DataFrame` are predictors.  
 
 For `Distribution`, currently 5 different types are supported. 
@@ -33,7 +33,7 @@ For `Distribution`, currently 5 different types are supported.
 - `Poisson()`:  count data
 - `CoxPH()`: survival or time-to-event data
 
-Different Kernels are availabe, including 
+Different Kernels are available, including 
 - `kernelLinear()` or `kernelVanilla`
 - `kernelPoly(degree=3, offset=1.0)`
 - `kernelRBF(σ=1.0)`: `σ` is the standard deviation
