@@ -10,17 +10,39 @@ Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
 
 ```
 
+Since it dependes on the newest [`GLMNet`](https://github.com/linxihui/GLMNet.jl) in my branch. It 
+has not yet been merge the main branch, so one have to clone and build the package as
+
+```julia
+Pkg.clone("git://github.com/linxihui/GLMNet.jl")
+Pkg.build("GLMNet")
+```
+
 # Syntax
 
 The main function of this package is `gausspr`, which have two methods like R
-`gausspr(::Formula, ::DataFrame, ::Distribution)` and `gausspr(::Array, ::Array, ::Distribution)`. 
-Symbol `..` is supported in `Formula`, meaning all other variables in `DataFrame`, equivalent to
-the `.` symbole in R formula. For example `y ~ ..` means `y` is the response and all other variable
-in the `DataFrame` are predictors.  For `Distribution`, corrently 5 different types are supported, 
-which are `Normal()` for continuous response or regression, `Binomial()` and `Multinomial()` for 
-classifications, `Poisson()`  for count data, and `CoxPH()` for survival analysis.
 
-Different Kernels are supported as well, including `kernelLinear`, `kernelPoly`, `kernelRBF`, `kernelLaplace`, `kernelMatern`, `kernelUser` (user defined kernel matrix). Kernel parameters can be specified as `kernelRBF(5.0)`, `kernelPoly(3, 1)`. See examples below.
+- `gausspr(::Formula, ::DataFrame, ::Distribution)`
+- `gausspr(::Array, ::Array, ::Distribution)`
+
+In formula, symbol `..` is supported, which means all other variables in `DataFrame`, equivalent to
+the `.` symbole in R formula. For example `y ~ ..` means `y` is the response and all other variable except `y`
+in the `DataFrame` are predictors.  
+
+For `Distribution`, currently 5 different types are supported, 
+- `Normal()` : regression of continuous response 
+- `Binomial()` and `Multinomial()`: classifications
+- `Poisson()`  for count data
+- `CoxPH()` for survival analysis
+
+Different Kernels are availabe, which are 
+- `kernelLinear()`
+- `kernelPoly(degree=3, offset=1.0)`
+- `kernelRBF(σ=1.0)`: `σ` is the standard deviation
+- `kernelLaplace(σ=1.0)`: `σ` is the scale parameter
+- `kernelMatern(ν=2.0, σ=1.0)`
+- `kernelUser(K)`: `K` is a user defined kernel matrix
+
 
 # A Quick Guide
 
