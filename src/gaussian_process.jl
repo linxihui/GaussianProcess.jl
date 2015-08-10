@@ -13,6 +13,7 @@ Object returned from `gausspr(::Array, ::Array)`.
 type GaussianProcessFittedMatrix{T <: Distribution} <: GaussianProcessFitted
     family::T
     kernel::Kernel
+	a0::Vector{Float64}
     alpha::Array
     xmatrix::Array
     xscale::Union(Nothing, Standardization)
@@ -125,13 +126,13 @@ function gausspr(x::Array, y::Array, family = Normal(0, 1.0); kernel = kernelRBF
     else
         lambda = 1.0 / size(x,1)
     end
-    mod = glmnet(F.', y, family, lambda = [lambda], alpha = 0.0, intercept = false, standardize = false);
+    mod = glmnet(F.', y, family, lambda = [lambda], alpha = 0.0, intercept = true, standardize = false);
 	betas = isa(family, Multinomial)? mod.betas[:, :, 1] : convert(Array, mod.betas)
     alpha = F \ betas
     if isa(family, Union(Normal, CoxPH, Poisson))
         alpha = alpha[:]
     end
-    return GaussianProcessFittedMatrix(family, kernel, alpha, x, xscale, yscale, ylev)
+    return GaussianProcessFittedMatrix(family, kernel, mod.a0, alpha, x, xscale, yscale, ylev)
 end
 
 
@@ -160,14 +161,14 @@ function predict(gp::GaussianProcessFittedMatrix, newdata::Array; outtype = :lin
         newdata = transform(gp.xscale, newdata)
     end
     x = kernelMatrix(gp.kernel, newdata, gp.xmatrix)
-    pred = x*gp.alpha
+    pred = x*gp.alpha + repmat(gp.a0[:].', size(x, 1), 1)
     # return depends on family type
     if isa(gp.family, Normal)
         if !isa(gp.yscale, Nothing)
             pred = inverseTransform(gp.yscale, pred)
         end
     elseif isa(gp.family, Binomial)
-        pred = transform_link([pred -pred], outtype, gp.ylev)
+        pred = transform_link([-pred pred], outtype, gp.ylev)
     elseif isa(gp.family, Multinomial)
         pred = transform_link(pred, outtype, gp.ylev)
     else
@@ -188,7 +189,7 @@ Prediction on new dataset
 Predicted probabilities, classes or response depended on input model
 """ ->
 function predict(gp::GaussianProcessFittedFormula, newdata::DataFrame; kargs...)
-    formula = completeFormula(gp.formula)
+    formula = completeFormula(gp.formula, newdata)
     formula.lhs = nothing
     x, = modelmatrix(formula, newdata, xlev = gp.xlev, ylev = gp.gp.ylev)
     return predict(gp.gp, x; kargs...)
