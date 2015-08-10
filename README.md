@@ -116,7 +116,7 @@ julia> ky_mod = gausspr(Kyphosis ~ .., kyphosis[iTrain, :], Binomial());
 
 julia> ky_pred = predict(ky_mod, kyphosis[iTest, :], outtype = :prob);
 
-julia> out = ROC(kyphosis[iTest, :Kyphosis].data, ky_pred[:, 1]);
+julia> out = ROC(kyphosis[iTest, :Kyphosis].data, ky_pred[:, 2]);
 
 julia> out.auc
 0.8715277777777777
