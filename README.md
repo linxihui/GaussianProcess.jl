@@ -5,13 +5,11 @@ This package has not yet registered in the METADATA. To install, run the followi
 
 ```julia
 # Install
-
 Pkg.clone("git://github.com/linxihui/GaussianProcess.jl")
 
 ```
 
-Since it dependes on the newest [`GLMNet`](https://github.com/linxihui/GLMNet.jl) in my branch. It 
-has not yet been merge the main branch, so one have to clone and build the package as
+Since it dependes on the newest [`GLMNet`](https://github.com/linxihui/GLMNet.jl), which is in my branch and has not been merge to the main branch, one has to clone and build the package as
 
 ```julia
 Pkg.clone("git://github.com/linxihui/GLMNet.jl")
@@ -29,14 +27,14 @@ In formula, symbol `..` is supported, which means all other variables in `DataFr
 the `.` symbole in R formula. For example `y ~ ..` means `y` is the response and all other variable except `y`
 in the `DataFrame` are predictors.  
 
-For `Distribution`, currently 5 different types are supported, 
+For `Distribution`, currently 5 different types are supported. 
 - `Normal()` : regression of continuous response 
 - `Binomial()` and `Multinomial()`: classifications
-- `Poisson()`  for count data
-- `CoxPH()` for survival analysis
+- `Poisson()`:  count data
+- `CoxPH()`: survival or time-to-event data
 
-Different Kernels are availabe, which are 
-- `kernelLinear()`
+Different Kernels are availabe, including 
+- `kernelLinear()` or `kernelVanilla`
 - `kernelPoly(degree=3, offset=1.0)`
 - `kernelRBF(σ=1.0)`: `σ` is the standard deviation
 - `kernelLaplace(σ=1.0)`: `σ` is the scale parameter
@@ -58,8 +56,7 @@ julia> dat = DataFrame(
 
 julia> gp = gausspr(D ~ A + B + C, dat, Binomial());
 
-julia> # predict class probabilities
-
+# predict class probabilities
 julia> pred = predict(gp, dat, outtype = :prob)
 4x2 Array{Float64,2}:
  0.432865  0.567135
@@ -74,8 +71,7 @@ julia> pred_class = predict(gp, dat, outtype = :class)
  "Yes"
  "No"
 
-julia> # use x-y input (regression)
-
+# use x-y input (regression)
 julia> x, y = modelmatrix(A ~ B + C + D, dat)
 (
 4x5 Array{Float64,2}:
@@ -97,7 +93,7 @@ julia> pred2 = predict(gp2, x)
  0.200377 
 ```
 
-# Binary classification
+# Binary Classification
 
 ```julia
 julia> using RDatasets
