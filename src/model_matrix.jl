@@ -1,6 +1,6 @@
 @doc """
 ## Description
-Complete ".." in a formula
+Expand ".." in a formula
 
 ## Arguments
 * `formula::Formula`: A model formula
@@ -9,7 +9,7 @@ Complete ".." in a formula
 ## Returns
 A formula with ".." filled if any
 """ ->
-function completeFormula(formula::Formula, data::DataFrame)
+function expandFormula(formula::Formula, data::DataFrame)
     if formula.rhs == :.. || (isa(formula.rhs, Expr) && formula.rhs.args[length(formula.rhs.args)] == :..)
 		formula = deepcopy(formula)
         args = isa(formula.lhs, Symbol)? [formula.lhs] : isa(formula.lhs, Nothing)? [] : formula.lhs.args
@@ -38,7 +38,7 @@ Create a model matrix from Formual and DataFrame input. Note that all factors (c
 * A tuple of desig matrix, response matrix, xlev and ylev tuples
 """ ->
 function modelmatrix(formula::Formula, data::DataFrame; xlev = (), ylev = ())
-	formula = completeFormula(formula, data);
+	formula = expandFormula(formula, data);
     mf = ModelFrame(formula, data).df
     # response
     if isa(formula.lhs, Nothing) 
